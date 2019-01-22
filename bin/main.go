@@ -3,9 +3,9 @@ package main
 import (
 	"bufio"
 	"context"
-	"database/sql"
 	"encoding/csv"
 	"githib.com/coraxster/passportChecker"
+	tiedot "github.com/HouzuoGuo/tiedot/db"
 	"github.com/labstack/gommon/log"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/seiflotfy/cuckoofilter"
@@ -16,28 +16,31 @@ import (
 )
 
 const CuckooCapacity = 200000000
-const SQLiteFilename = "state.sql"
+const TiedotDir = "./tiedot/"
 const CuckooFilename = "cuckoo.data"
 
 func main() {
 	ctx := makeContext()
-	db, err := sql.Open("sqlite3", "./"+SQLiteFilename)
+
+	db, err := tiedot.OpenDB(TiedotDir)
+	checkError(err)
+
+	chTc, err := passportChecker.MakeTiedotChecker(db)
 	checkError(err)
 
 	f, err := getCuckoo(CuckooCapacity)
 	checkError(err)
 
-	chSql, err := passportChecker.MakeSQLiteChecker(db)
-	checkError(err)
-
 	chCuckoo, err := passportChecker.MakeCuckooChecker(f)
 	checkError(err)
 
-	ch := passportChecker.MakeMultiChecker(chCuckoo, chSql)
+	ch := passportChecker.MakeMultiChecker(chCuckoo, chTc)
 
 	AddCSVFile(ctx, ch, "/Users/dmitry.kuzmin/dev/test/passports/list_of_expired_passports.csv")
 
 	err = saveCuckoo(f)
+	checkError(err)
+	err = db.Close()
 	checkError(err)
 }
 
