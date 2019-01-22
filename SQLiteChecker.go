@@ -58,6 +58,13 @@ func (c *SQLiteChecker) addChunk(values []interface{}) error {
 	return nil
 }
 
+func (c *SQLiteChecker) Count() (int, error) {
+	row := c.db.QueryRow("SELECT COALESCE(MAX(id)+1, 0) FROM value_store")
+	var i int
+	err := row.Scan(&i)
+	return i, err
+}
+
 func (c *SQLiteChecker) Check(values []interface{}) ([]bool, error) {
 	result := make([]bool, len(values))
 	if len(values) == 0 {
@@ -79,13 +86,6 @@ func (c *SQLiteChecker) Check(values []interface{}) ([]bool, error) {
 		result = append(result, r...)
 	}
 	return result, nil
-}
-
-func (c *SQLiteChecker) Count() (int, error) {
-	row := c.db.QueryRow("SELECT COALESCE(MAX(id)+1, 0) FROM value_store")
-	var i int
-	err := row.Scan(&i)
-	return i, err
 }
 
 func (c *SQLiteChecker) checkChunk(values []interface{}) ([]bool, error) {
@@ -129,7 +129,7 @@ func (c *SQLiteChecker) checkChunk(values []interface{}) ([]bool, error) {
 }
 
 func migrate(db *sql.DB) error {
-	_, err := db.Exec("CREATE TABLE IF NOT EXISTS value_store (id INTEGER PRIMARY KEY, val STRING UNIQUE, date_added INTEGER)")
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS value_store (id INTEGER PRIMARY KEY, val TEXT UNIQUE, date_added INTEGER)")
 	if err != nil {
 		return err
 	}
