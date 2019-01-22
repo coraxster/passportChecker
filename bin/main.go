@@ -15,10 +15,11 @@ import (
 )
 
 const CuckooCapacity = 200000000
+const StateFilename = "state.sql"
 
 func main() {
 	ctx := makeContext()
-	db, err := sql.Open("sqlite3", "./test.db")
+	db, err := sql.Open("sqlite3", "./"+StateFilename)
 	checkError(err)
 
 	f, err := getCuckoo(db, CuckooCapacity)

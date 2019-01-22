@@ -15,7 +15,7 @@ func MakeCuckooChecker(cf *cuckoo.Filter) (*CuckooChecker, error) {
 
 func (c *CuckooChecker) Add(values []interface{}) error {
 	for _, val := range values {
-		c.cf.Insert([]byte(fmt.Sprint(val)))
+		c.cf.InsertUnique([]byte(fmt.Sprint(val)))
 	}
 	return nil
 }

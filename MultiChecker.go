@@ -10,26 +10,16 @@ func MakeMultiChecker(soft, strong ExistChecker) *MultiChecker {
 }
 
 func (mc *MultiChecker) Add(values []interface{}) error {
-	existsMap, err := mc.Check(values)
-	if err != nil {
-		return err
-	}
-	toAdd := make([]interface{}, 0)
-	for i, e := range existsMap {
-		if !e {
-			toAdd = append(toAdd, values[i])
-		}
-	}
-	if len(toAdd) == 0 {
+	if len(values) == 0 {
 		return nil
 	}
 	errCh := make(chan error)
 	defer close(errCh)
 	go func() {
-		errCh <- mc.soft.Add(toAdd)
+		errCh <- mc.soft.Add(values)
 	}()
 	go func() {
-		errCh <- mc.strong.Add(toAdd)
+		errCh <- mc.strong.Add(values)
 	}()
 
 	if err := <-errCh; err != nil {
@@ -40,7 +30,6 @@ func (mc *MultiChecker) Add(values []interface{}) error {
 		return err
 	}
 	return <-errCh
-
 }
 
 func (mc *MultiChecker) Check(values []interface{}) ([]bool, error) {
