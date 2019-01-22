@@ -81,6 +81,13 @@ func (c *SQLiteChecker) Check(values []interface{}) ([]bool, error) {
 	return result, nil
 }
 
+func (c *SQLiteChecker) Count() (int, error) {
+	row := c.db.QueryRow("SELECT COALESCE(MAX(id)+1, 0) FROM value_store")
+	var i int
+	err := row.Scan(&i)
+	return i, err
+}
+
 func (c *SQLiteChecker) checkChunk(values []interface{}) ([]bool, error) {
 	strs := make([]string, 0, len(values))
 	strMap := make(map[string]bool)

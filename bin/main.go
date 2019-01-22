@@ -5,11 +5,15 @@ import (
 	"context"
 	"database/sql"
 	"encoding/csv"
-	"githib.com/coraxster/passportChecker"
-	"github.com/labstack/gommon/log"
+	"flag"
+	"github.com/coraxster/passportChecker"
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/seiflotfy/cuckoofilter"
 	"io"
+	"log"
+	"net/http"
 	"os"
 	"os/signal"
 )
@@ -17,7 +21,11 @@ import (
 const CuckooCapacity = 200000000
 const StateFilename = "state.sql"
 
+var parseFile = flag.String("parseFile", "", "parse file on start")
+var port = flag.String("port", "80", "serve port")
+
 func main() {
+	flag.Parse()
 	ctx := makeContext()
 	db, err := sql.Open("sqlite3", "./"+StateFilename)
 	checkError(err)
@@ -33,41 +41,77 @@ func main() {
 
 	ch := passportChecker.MakeMultiChecker(chCuckoo, chSql)
 
-	AddCSVFile(ctx, ch, "/Users/dmitry.kuzmin/dev/test/passports/list_of_expired_passports.csv")
+	go func() {
+		if len(*parseFile) > 0 {
+			log.Print("parsing file: " + *parseFile)
+			err = AddCSVFile(ctx, ch, *parseFile)
+			if err != nil {
+				log.Print(err)
+			}
+			err = saveCuckoo(db, f)
+			if err != nil {
+				log.Print(err)
+			}
+		}
+	}()
 
-	err = saveCuckoo(db, f)
+	h := passportChecker.MakeHandler(ch, chSql)
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+
+	r.Get("/check/{value}", h.Check)
+	r.Get("/count", h.Count)
+
+	srv := http.Server{Addr: ":" + *port, Handler: r}
+	log.Print("starting serving on :" + *port)
+	go func() {
+		err := srv.ListenAndServe()
+		if err != http.ErrServerClosed {
+			checkError(err)
+		}
+	}()
+	<-ctx.Done()
+	err = srv.Shutdown(context.Background())
 	checkError(err)
 }
 
-func AddCSVFile(ctx context.Context, ch *passportChecker.MultiChecker, path string) {
-	//lc := 118 544 508
+func AddCSVFile(ctx context.Context, ch *passportChecker.MultiChecker, path string) error {
 	file, err := os.Open(path)
-	checkError(err)
+	if err != nil {
+		return err
+	}
 	reader := csv.NewReader(bufio.NewReader(file))
 	_, err = reader.Read() // skip header line
-	checkError(err)
-	chunk := make([]interface{}, 0, 100000)
+	if err != nil {
+		return err
+	}
+	chunk := make([]interface{}, 0, 1000)
 	var readCount uint
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		default:
 		}
 		line, err := reader.Read()
 		if err == io.EOF {
-			return
+			return nil
 		}
-		checkError(err)
+		if err != nil {
+			return err
+		}
 		chunk = append(chunk, line[0]+line[1])
 		if len(chunk) == cap(chunk) {
 			err = ch.Add(chunk)
-			checkError(err)
+			if err != nil {
+				return err
+			}
 			chunk = make([]interface{}, 0, cap(chunk))
 		}
 		readCount++
 		if readCount%100000 == 0.0 {
-			log.Print(readCount)
+			log.Printf("read: %v", readCount)
 		}
 	}
 }
@@ -90,8 +134,9 @@ func getCuckoo(db *sql.DB, cap uint) (*cuckoo.Filter, error) {
 }
 
 func saveCuckoo(db *sql.DB, f *cuckoo.Filter) error {
-	log.Print("saving Cuckoo..")
+	log.Print("saving Cuckoo...")
 	_, err := db.Exec("INSERT INTO cuckoo_store (filter) VALUES (?)", f.Encode())
+	log.Print("cuckoo saved")
 	return err
 }
 
