@@ -121,6 +121,12 @@ func (c *SQLiteChecker) checkChunk(values []interface{}) ([]bool, error) {
 			strMap[v] = true
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return []bool{}, err
+	}
+	if err = rows.Close(); err != nil {
+		return []bool{}, err
+	}
 	result := make([]bool, len(values))
 	for i, s := range strs {
 		result[i] = strMap[s]
