@@ -9,7 +9,7 @@ import (
 	"github.com/coraxster/passportChecker"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/seiflotfy/cuckoofilter"
 	"io"
 	"log"
@@ -19,12 +19,13 @@ import (
 )
 
 const CuckooCapacity = 200000000
-const StateFilename = "state.sql"
 
 var parseFile = flag.String("parseFile", "", "parse file on start")
+var dbDsn = flag.String("dbDsn", "root:root@tcp(127.0.0.1:3306)/go", "example: root:root@tcp(127.0.0.1:3306)/go")
 var port = flag.String("port", "80", "serve port")
 
 func main() {
+	// passwordChecker
 	flag.Parse()
 
 	logF, err := os.OpenFile("log.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
@@ -33,7 +34,8 @@ func main() {
 	log.SetOutput(io.MultiWriter(os.Stdout, logF))
 
 	ctx := makeContext()
-	db, err := sql.Open("sqlite3", "./"+StateFilename)
+
+	db, err := connectDb(*dbDsn)
 	checkError(err)
 
 	f, err := getCuckoo(db, CuckooCapacity)
@@ -123,11 +125,11 @@ func AddCSVFile(ctx context.Context, ch *passportChecker.MultiChecker, path stri
 }
 
 func getCuckoo(db *sql.DB, cap uint) (*cuckoo.Filter, error) {
-	_, err := db.Exec("CREATE TABLE IF NOT EXISTS cuckoo_store (id INTEGER PRIMARY KEY, filter BLOB)")
+	_, err := db.Exec("CREATE TABLE `cuckoo_store` (`id` int(11) unsigned NOT NULL AUTO_INCREMENT,`filter` longblob NOT NULL,PRIMARY KEY (`id`));")
 	if err != nil {
 		return nil, err
 	}
-	row := db.QueryRow("SELECT filter FROM cuckoo_store order by id desc limit 1")
+	row := db.QueryRow("SELECT `filter` FROM `cuckoo_store` order by `id` desc limit 1")
 	b := make([]byte, 0)
 	err = row.Scan(&b)
 	if err != sql.ErrNoRows && err != nil {
@@ -141,7 +143,7 @@ func getCuckoo(db *sql.DB, cap uint) (*cuckoo.Filter, error) {
 
 func saveCuckoo(db *sql.DB, f *cuckoo.Filter) error {
 	log.Print("saving Cuckoo...")
-	_, err := db.Exec("INSERT INTO cuckoo_store (filter) VALUES (?)", f.Encode())
+	_, err := db.Exec("INSERT INTO `cuckoo_store` (`filter`) VALUES (?)", f.Encode())
 	log.Print("cuckoo saved")
 	return err
 }
@@ -163,4 +165,15 @@ func makeContext() context.Context {
 		signal.Stop(c)
 	}()
 	return ctx
+}
+
+func connectDb(dbDsn string) (*sql.DB, error) {
+	con, err := sql.Open("mysql", dbDsn)
+	if err != nil {
+		return nil, err
+	}
+	if err := con.Ping(); err != nil {
+		return nil, err
+	}
+	return con, nil
 }

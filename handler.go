@@ -8,10 +8,10 @@ import (
 
 type Handler struct {
 	ch    ExistChecker
-	chSql *SQLiteChecker
+	chSql *MySQLChecker
 }
 
-func MakeHandler(ch ExistChecker, chSql *SQLiteChecker) *Handler {
+func MakeHandler(ch ExistChecker, chSql *MySQLChecker) *Handler {
 	return &Handler{ch: ch, chSql: chSql}
 }
 
