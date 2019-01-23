@@ -12,6 +12,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/seiflotfy/cuckoofilter"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -19,13 +20,14 @@ import (
 )
 
 const CuckooCapacity = 200000000
+const CuckooFilename = "cuckoo.data"
 
 var parseFile = flag.String("parseFile", "", "parse file on start")
 var dbDsn = flag.String("dbDsn", "root:root@tcp(127.0.0.1:3306)/go", "example: root:root@tcp(127.0.0.1:3306)/go")
 var port = flag.String("port", "80", "serve port")
 
 func main() {
-	// passwordChecker
+	// passwordChecker:passwordChecker@tcp(password-checker.cnqcjxetf5yl.us-east-2.rds.amazonaws.com:3306)/passwordChecker
 	flag.Parse()
 
 	logF, err := os.OpenFile("log.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
@@ -38,7 +40,7 @@ func main() {
 	db, err := connectDb(*dbDsn)
 	checkError(err)
 
-	f, err := getCuckoo(db, CuckooCapacity)
+	f, err := getCuckoo(CuckooCapacity)
 	checkError(err)
 
 	chSql, err := passportChecker.MakeSQLiteChecker(db)
@@ -58,7 +60,7 @@ func main() {
 				log.Print(err)
 				return
 			}
-			err = saveCuckoo(db, f)
+			err = saveCuckoo(f)
 			if err != nil {
 				log.Print(err)
 			}
@@ -131,27 +133,17 @@ func AddCSVFile(ctx context.Context, ch *passportChecker.MultiChecker, path stri
 	}
 }
 
-func getCuckoo(db *sql.DB, cap uint) (*cuckoo.Filter, error) {
-	_, err := db.Exec("CREATE TABLE IF NOT EXISTS `cuckoo_store` (`id` int(11) unsigned NOT NULL AUTO_INCREMENT,`filter` longblob NOT NULL,PRIMARY KEY (`id`));")
-	if err != nil {
-		return nil, err
-	}
-	row := db.QueryRow("SELECT `filter` FROM `cuckoo_store` order by `id` desc limit 1")
-	b := make([]byte, 0)
-	err = row.Scan(&b)
-	if err != sql.ErrNoRows && err != nil {
-		return nil, err
-	}
+func getCuckoo(cap uint) (*cuckoo.Filter, error) {
+	b, _ := ioutil.ReadFile("./" + CuckooFilename)
 	if len(b) == 0 {
 		return cuckoo.NewFilter(cap), nil
 	}
 	return cuckoo.Decode(b)
 }
 
-func saveCuckoo(db *sql.DB, f *cuckoo.Filter) error {
-	log.Print("saving Cuckoo...")
-	_, err := db.Exec("INSERT INTO `cuckoo_store` (`filter`) VALUES (?)", f.Encode())
-	log.Print("cuckoo saved")
+func saveCuckoo(f *cuckoo.Filter) error {
+	log.Print("saving Cuckoo..")
+	err := ioutil.WriteFile("./"+CuckooFilename, f.Encode(), 0644)
 	return err
 }
 
