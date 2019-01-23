@@ -77,6 +77,7 @@ func main() {
 
 	r.Get("/check/{value}", h.Check)
 	r.Get("/count", h.Count)
+	r.Get("/get-from/{ts}", h.GetFrom)
 
 	srv := http.Server{Addr: ":" + *port, Handler: r}
 	log.Print("starting serving on :" + *port)

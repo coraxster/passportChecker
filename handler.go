@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/go-chi/chi"
 	"net/http"
+	"strconv"
+	"time"
 )
 
 type Handler struct {
@@ -23,6 +25,10 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, err = w.Write([]byte(fmt.Sprintf("%v:%v", value, result[0])))
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 }
 
 func (h *Handler) Count(w http.ResponseWriter, r *http.Request) {
@@ -32,9 +38,29 @@ func (h *Handler) Count(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, err = w.Write([]byte(fmt.Sprintf("count:%v", result)))
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 }
 
-//func (h *Handler) GetFrom(w http.ResponseWriter, r *http.Request) {
-//	ts := chi.URLParam(r, "ts")
-//
-//}
+func (h *Handler) GetFrom(w http.ResponseWriter, r *http.Request) {
+	ts, err := strconv.ParseInt(chi.URLParam(r, "ts"), 10, 64)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	fmt.Println(ts)
+	result, err := h.chSql.GetFrom(time.Unix(ts, 0))
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	for _, v := range result {
+		_, err = w.Write([]byte(fmt.Sprintf("%v\r\n", v)))
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+	}
+}

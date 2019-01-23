@@ -3,7 +3,9 @@ package passportChecker
 import (
 	"database/sql"
 	"fmt"
+	"github.com/pkg/errors"
 	"strings"
+	"time"
 )
 
 const ChunkSize = 300
@@ -61,6 +63,38 @@ func (c *MySQLChecker) Count() (int, error) {
 	var i int
 	err := row.Scan(&i)
 	return i, err
+}
+
+func (c *MySQLChecker) GetFrom(t time.Time) ([]interface{}, error) {
+	row := c.db.QueryRow("SELECT COUNT(*) FROM `value_store` where `date_added` >= ?", t.Format("2006-01-02 15:04:05"))
+	var i int
+	err := row.Scan(&i)
+	if err != nil {
+		return []interface{}{}, err
+	}
+	if i > 1000000 {
+		return []interface{}{}, errors.New("Too much, >1000000")
+	}
+
+	rows, err := c.db.Query("SELECT `val` FROM `value_store` where `date_added` >= ?", t.Format("2006-01-02 15:04:05"))
+	if err != nil {
+		return []interface{}{}, err
+	}
+	result := make([]interface{}, 0)
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			return []interface{}{}, err
+		}
+		result = append(result, v)
+	}
+	if err := rows.Err(); err != nil {
+		return []interface{}{}, err
+	}
+	if err = rows.Close(); err != nil {
+		return []interface{}{}, err
+	}
+	return result, nil
 }
 
 func (c *MySQLChecker) Check(values []interface{}) ([]bool, error) {
