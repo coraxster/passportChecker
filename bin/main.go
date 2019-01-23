@@ -26,6 +26,12 @@ var port = flag.String("port", "80", "serve port")
 
 func main() {
 	flag.Parse()
+
+	logF, err := os.OpenFile("log.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	checkError(err)
+	defer logF.Close()
+	log.SetOutput(io.MultiWriter(os.Stdout, logF))
+
 	ctx := makeContext()
 	db, err := sql.Open("sqlite3", "./"+StateFilename)
 	checkError(err)
