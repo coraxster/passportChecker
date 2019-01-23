@@ -14,7 +14,6 @@ func (mc *MultiChecker) Add(values []interface{}) error {
 		return nil
 	}
 	errCh := make(chan error)
-	defer close(errCh)
 	go func() {
 		errCh <- mc.soft.Add(values)
 	}()
@@ -29,7 +28,9 @@ func (mc *MultiChecker) Add(values []interface{}) error {
 		}()
 		return err
 	}
-	return <-errCh
+	err := <-errCh
+	close(errCh)
+	return err
 }
 
 func (mc *MultiChecker) Check(values []interface{}) ([]bool, error) {

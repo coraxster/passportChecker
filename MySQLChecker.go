@@ -26,7 +26,7 @@ func (c *MySQLChecker) Add(values []interface{}) error {
 	var err error
 	var i int
 	for i = 0; i+ChunkSize < len(values); i = i + ChunkSize {
-		err = c.addChunk(values[i : i+ChunkSize])
+		err = c.addChunk(values[i : i+ChunkSize]) // need to parallel ?
 		if err != nil {
 			return err
 		}
@@ -133,7 +133,7 @@ func (c *MySQLChecker) checkChunk(values []interface{}) ([]bool, error) {
 }
 
 func migrate(db *sql.DB) error {
-	_, err := db.Exec("CREATE TABLE IF NOT EXISTS `value_store` (`val` varchar(16) NOT NULL DEFAULT '',`date_added` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),PRIMARY KEY (`val`),KEY `index_date` (`date_added`))")
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS `value_store` (`val` varchar(16) NOT NULL DEFAULT '',`date_added` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY (`val`),KEY `index_date` (`date_added`))")
 	if err != nil {
 		return err
 	}
