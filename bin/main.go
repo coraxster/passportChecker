@@ -49,19 +49,24 @@ func main() {
 
 	ch := passportChecker.MakeMultiChecker(chCuckoo, chSql)
 
-	go func() {
-		if len(*parseFile) > 0 {
+	parseDone := make(chan struct{})
+	if len(*parseFile) > 0 {
+		go func() {
 			log.Print("parsing file: " + *parseFile)
 			err = AddCSVFile(ctx, ch, *parseFile)
 			if err != nil {
 				log.Print(err)
+				return
 			}
 			err = saveCuckoo(db, f)
 			if err != nil {
 				log.Print(err)
 			}
-		}
-	}()
+			close(parseDone)
+		}()
+	} else {
+		close(parseDone)
+	}
 
 	h := passportChecker.MakeHandler(ch, chSql)
 	r := chi.NewRouter()
@@ -80,12 +85,10 @@ func main() {
 		}
 	}()
 	<-ctx.Done()
-	err = saveCuckoo(db, f)
-	if err != nil {
-		log.Print(err)
-	}
 	err = srv.Shutdown(context.Background())
 	checkError(err)
+
+	<-parseDone
 }
 
 func AddCSVFile(ctx context.Context, ch *passportChecker.MultiChecker, path string) error {
@@ -129,7 +132,7 @@ func AddCSVFile(ctx context.Context, ch *passportChecker.MultiChecker, path stri
 }
 
 func getCuckoo(db *sql.DB, cap uint) (*cuckoo.Filter, error) {
-	_, err := db.Exec("CREATE TABLE `cuckoo_store` (`id` int(11) unsigned NOT NULL AUTO_INCREMENT,`filter` longblob NOT NULL,PRIMARY KEY (`id`));")
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS `cuckoo_store` (`id` int(11) unsigned NOT NULL AUTO_INCREMENT,`filter` longblob NOT NULL,PRIMARY KEY (`id`));")
 	if err != nil {
 		return nil, err
 	}
