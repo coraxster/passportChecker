@@ -80,6 +80,10 @@ func main() {
 		}
 	}()
 	<-ctx.Done()
+	err = saveCuckoo(db, f)
+	if err != nil {
+		log.Print(err)
+	}
 	err = srv.Shutdown(context.Background())
 	checkError(err)
 }
