@@ -9,7 +9,7 @@ type MapChecker struct {
 	m2 map[string]struct{}
 }
 
-//7.2gb, low cpu, fast resolves, handmade, easy to persist on disk, GC
+//7.2gb(6 with each 1000000 gc), low cpu, fast resolves, handmade, easy to persist on disk, GC
 func MakeMapChecker() *MapChecker {
 	return &MapChecker{make(map[string]struct{}), make(map[string]struct{})}
 }
