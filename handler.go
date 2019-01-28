@@ -5,6 +5,7 @@ import (
 	"github.com/go-chi/chi"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -19,7 +20,12 @@ func MakeHandler(ch ExistChecker, chSql *MySQLChecker) *Handler {
 
 func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 	value := chi.URLParam(r, "value")
-	result, err := h.ch.Check([]interface{}{value})
+	p, err := MakePassport(strings.Replace(strings.Replace(value, " ", "", -1), "-", "", -1), "")
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	result, err := h.ch.Check([]interface{}{p.Uint64()})
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return

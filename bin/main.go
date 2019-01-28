@@ -17,14 +17,20 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
+	"strings"
 )
 
 const CuckooCapacity = 200000000
 const CuckooFilename = "cuckoo.data"
 
 var parseFile = flag.String("parseFile", "", "parse file on start")
-var dbDsn = flag.String("dbDsn", "root:root@tcp(127.0.0.1:3306)/go", "example: root:root@tcp(127.0.0.1:3306)/go")
+
+//var dbDsn = flag.String("dbDsn", "root:root@tcp(127.0.0.1:3306)/go", "example: root:root@tcp(127.0.0.1:3306)/go")
 var port = flag.String("port", "80", "serve port")
+
+//todo: возможно сделать конфигурируемым, где хранить данные
+// или просто выбрать лучший вариант и сотавить его
 
 func main() {
 	// passwordChecker:passwordChecker@tcp(password-checker.cnqcjxetf5yl.us-east-2.rds.amazonaws.com:3306)/passwordChecker
@@ -37,47 +43,84 @@ func main() {
 
 	ctx := makeContext()
 
-	db, err := connectDb(*dbDsn)
-	checkError(err)
+	//oh :=  offheap.NewHashTable(130000000)
+	//ohC := passportChecker.MakeOffheapChecker(oh)
 
-	f, err := getCuckoo(CuckooCapacity)
-	checkError(err)
+	//fc := fastcache.New(16 * bytes.GB)
+	//fcc := passportChecker.MakeFastCacheChecker(fc)
 
-	chSql, err := passportChecker.MakeSQLiteChecker(db)
-	checkError(err)
+	//opts := badger.DefaultOptions
+	//opts.Dir = "./badger"
+	//opts.ValueDir = "./badger"
+	//bdb, err := badger.Open(opts)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//defer bdb.Close()
+	//bc := passportChecker.MakeBadgerChecker(bdb)
 
-	chCuckoo, err := passportChecker.MakeCuckooChecker(f)
-	checkError(err)
+	m := passportChecker.MakeMapChecker()
 
-	ch := passportChecker.MakeMultiChecker(chCuckoo, chSql)
+	//pt := passportChecker.MakePrefixTree()
+	//err = pt.Add("12")
+	//checkError(err)
+	//
+	//resp2, err := pt.Check("12")
+	//checkError(err)
+	//log.Fatal(resp2)
+	//chPrefix := passportChecker.MakePrefixTreeChecker(pt)
+
+	//db, err := connectDb(*dbDsn)
+	//checkError(err)
+
+	//chSql, err := passportChecker.MakeSQLiteChecker(db)
+	//checkError(err)
+
+	//f, err := getCuckoo(CuckooCapacity)
+	//checkError(err)
+
+	//chCuckoo, err := passportChecker.MakeCuckooChecker(f)
+	//checkError(err)
+
+	//ch := passportChecker.MakeMultiChecker(chCuckoo, chPrefix)
+
+	ch := m
+
+	//err = ch.Add([]interface{}{"12"})
+	//checkError(err)
+	//resp1, err := ch.Check([]interface{}{"12"})
+	//checkError(err)
+	//log.Fatal(resp1)
 
 	parseDone := make(chan struct{})
 	if len(*parseFile) > 0 {
 		go func() {
+			//defer profile.Start(profile.MemProfile).Stop()
 			log.Print("parsing file: " + *parseFile)
 			err = AddCSVFile(ctx, ch, *parseFile)
 			if err != nil {
 				log.Print(err)
 				return
 			}
-			err = saveCuckoo(f)
-			if err != nil {
-				log.Print(err)
-			}
+			runtime.GC()
+			//err = saveCuckoo(f)
+			//if err != nil {
+			//	log.Print(err)
+			//}
 			close(parseDone)
 		}()
 	} else {
 		close(parseDone)
 	}
 
-	h := passportChecker.MakeHandler(ch, chSql)
 	r := chi.NewRouter()
+	h := passportChecker.MakeHandler(ch, nil)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
 	r.Get("/check/{value}", h.Check)
-	r.Get("/count", h.Count)
-	r.Get("/get-from/{ts}", h.GetFrom)
+	//r.Get("/count", h.Count)
+	//r.Get("/get-from/{ts}", h.GetFrom)
 
 	srv := http.Server{Addr: ":" + *port, Handler: r}
 	log.Print("starting serving on :" + *port)
@@ -94,7 +137,11 @@ func main() {
 	<-parseDone
 }
 
-func AddCSVFile(ctx context.Context, ch *passportChecker.MultiChecker, path string) error {
+// todo: переделать в сервис. Типа Importer
+// сделать handler для него, со прогрессом и тд
+// что бы он ещё смог сам скачивать и импортить по запросу
+// предусмотреть докачку при обрыве, с количеством попыток
+func AddCSVFile(ctx context.Context, ch passportChecker.ExistChecker, path string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -119,7 +166,14 @@ func AddCSVFile(ctx context.Context, ch *passportChecker.MultiChecker, path stri
 		if err != nil {
 			return err
 		}
-		chunk = append(chunk, line[0]+line[1])
+		p, err := passportChecker.MakePassport(
+			strings.Replace(strings.Replace(line[0], " ", "", -1), "-", "", -1),
+			strings.Replace(strings.Replace(line[1], " ", "", -1), "-", "", -1))
+		if err != nil {
+			log.Println(err.Error())
+			continue
+		}
+		chunk = append(chunk, p.Uint64())
 		if len(chunk) == cap(chunk) {
 			err = ch.Add(chunk)
 			if err != nil {
@@ -128,9 +182,12 @@ func AddCSVFile(ctx context.Context, ch *passportChecker.MultiChecker, path stri
 			chunk = make([]interface{}, 0, cap(chunk))
 		}
 		readCount++
-		if readCount%100000 == 0.0 {
+		if readCount%1000000 == 0.0 {
 			log.Printf("read: %v", readCount)
 		}
+		//if readCount%1000000 == 0.0 {
+		//	runtime.GC()
+		//}
 	}
 }
 
