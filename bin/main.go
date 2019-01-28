@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/seiflotfy/cuckoofilter"
 	"io"
 	"io/ioutil"
@@ -43,6 +44,19 @@ func main() {
 
 	ctx := makeContext()
 
+	//lDb, err := leveldb.OpenFile("dataLevel.db", nil)
+	//checkError(err)
+	//lCh := passportChecker.MakeLevelDBChecker(lDb)
+
+	//bDb, err := bolt.Open("dataBolt.db", 0600, nil)
+	//checkError(err)
+	//err = bDb.Update(func(tx *bolt.Tx) error {
+	//	_, err := tx.CreateBucketIfNotExists([]byte("data"))
+	//	return err
+	//})
+	//checkError(err)
+	//bDbCh := passportChecker.MakeBoltDBChecker(bDb)
+
 	//oh :=  offheap.NewHashTable(130000000)
 	//ohC := passportChecker.MakeOffheapChecker(oh)
 
@@ -59,7 +73,7 @@ func main() {
 	//defer bdb.Close()
 	//bc := passportChecker.MakeBadgerChecker(bdb)
 
-	m := passportChecker.MakeMapChecker()
+	//m := passportChecker.MakeMapChecker()
 
 	//pt := passportChecker.MakePrefixTree()
 	//err = pt.Add("12")
@@ -72,9 +86,13 @@ func main() {
 
 	//db, err := connectDb(*dbDsn)
 	//checkError(err)
-
-	//chSql, err := passportChecker.MakeSQLiteChecker(db)
+	//chSql, err := passportChecker.MakeMySQLChecker(db)
 	//checkError(err)
+
+	db, err := sql.Open("sqlite3", "./data.sqlite")
+	checkError(err)
+	chSql, err := passportChecker.MakeSQLiteChecker(db)
+	checkError(err)
 
 	//f, err := getCuckoo(CuckooCapacity)
 	//checkError(err)
@@ -84,7 +102,7 @@ func main() {
 
 	//ch := passportChecker.MakeMultiChecker(chCuckoo, chPrefix)
 
-	ch := m
+	ch := chSql
 
 	//err = ch.Add([]interface{}{"12"})
 	//checkError(err)
@@ -185,7 +203,7 @@ func AddCSVFile(ctx context.Context, ch passportChecker.ExistChecker, path strin
 		if readCount%1000000 == 0.0 {
 			log.Printf("read: %v", readCount)
 		}
-		//if readCount%1000000 == 0.0 {
+		//if readCount%10000000 == 0.0 {
 		//	runtime.GC()
 		//}
 	}

@@ -14,11 +14,9 @@ type MySQLChecker struct {
 	db *sql.DB
 }
 
-func MakeSQLiteChecker(db *sql.DB) (*MySQLChecker, error) {
-	if err := migrate(db); err != nil {
-		return nil, err
-	}
-	return &MySQLChecker{db}, nil
+func MakeMySQLChecker(db *sql.DB) (*MySQLChecker, error) {
+	c := &MySQLChecker{db}
+	return c, c.migrate()
 }
 
 func (c *MySQLChecker) Add(values []interface{}) error {
@@ -166,8 +164,8 @@ func (c *MySQLChecker) checkChunk(values []interface{}) ([]bool, error) {
 	return result, nil
 }
 
-func migrate(db *sql.DB) error {
-	_, err := db.Exec("CREATE TABLE IF NOT EXISTS `value_store` (`val` varchar(16) NOT NULL DEFAULT '',`date_added` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY (`val`),KEY `index_date` (`date_added`))")
+func (c *MySQLChecker) migrate() error {
+	_, err := c.db.Exec("CREATE TABLE IF NOT EXISTS `value_store` (`val` varchar(16) NOT NULL DEFAULT '',`date_added` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY (`val`),KEY `index_date` (`date_added`))")
 	if err != nil {
 		return err
 	}
