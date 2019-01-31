@@ -44,6 +44,8 @@ func main() {
 
 	ctx := makeContext()
 
+	//slCh := passportChecker.MakeSliceChecker(130000000)
+
 	//lDb, err := leveldb.OpenFile("dataLevel.db", nil)
 	//checkError(err)
 	//lCh := passportChecker.MakeLevelDBChecker(lDb)
