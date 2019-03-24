@@ -9,7 +9,7 @@ func MakeMultiChecker(soft, strong ExistChecker) *MultiChecker {
 	return &MultiChecker{soft, strong}
 }
 
-func (mc *MultiChecker) Add(values []interface{}) error {
+func (mc *MultiChecker) Add(values []string) error {
 	if len(values) == 0 {
 		return nil
 	}
@@ -33,7 +33,7 @@ func (mc *MultiChecker) Add(values []interface{}) error {
 	return err
 }
 
-func (mc *MultiChecker) Check(values []interface{}) ([]bool, error) {
+func (mc *MultiChecker) Check(values []string) ([]bool, error) {
 	if len(values) == 0 {
 		return make([]bool, 0), nil
 	}
@@ -41,7 +41,7 @@ func (mc *MultiChecker) Check(values []interface{}) ([]bool, error) {
 	if err != nil {
 		return []bool{}, err
 	}
-	valuesInSoft := make([]interface{}, 0)
+	valuesInSoft := make([]string, 0)
 	valuesInSoftMap := make(map[int]int, 0)
 	j := 0
 	for i, e := range existsMap {
